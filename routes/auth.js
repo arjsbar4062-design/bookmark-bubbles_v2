@@ -1,11 +1,9 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import Database from 'better-sqlite3';
 
-const db = new Database('/var/data/app.db');
 const router = express.Router();
 
-function getSetting(key){
+function getSetting(db, key){
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row?.value ?? null;
 }
@@ -20,7 +18,7 @@ router.post('/login', async (req,res)=>{
   if (!['guest','owner'].includes(role)) return res.status(400).json({error:'invalid role'});
 
   const key = role === 'owner' ? 'owner_hash' : 'guest_hash';
-  const hash = getSetting(key);
+  const hash = getSetting(req.db, key);
   if (!hash) return res.status(500).json({error: 'password not set'});
 
   const ok = await bcrypt.compare(password, hash);
