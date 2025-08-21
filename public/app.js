@@ -39,6 +39,7 @@ function renderNode(node, parentEl) {
   }
 }
 
+// ---------------------- Login / Logout ----------------------
 document.getElementById("login-btn").onclick = async () => {
   const role = document.getElementById("role").value;
   const password = document.getElementById("password").value;
@@ -58,6 +59,7 @@ document.getElementById("logout-btn").onclick = async () => {
   location.reload();
 };
 
+// ---------------------- Export ----------------------
 document.getElementById("export-btn").onclick = async () => {
   const res = await fetch("/api/bookmarks/export", { method: "POST" });
   const blob = await res.blob();
@@ -67,6 +69,7 @@ document.getElementById("export-btn").onclick = async () => {
   a.click();
 };
 
+// ---------------------- Import ----------------------
 document.getElementById("import-btn").onclick = () => {
   document.getElementById("import-file").click();
 };
@@ -76,10 +79,17 @@ document.getElementById("import-file").onchange = async (e) => {
   if (!file) return;
   const text = await file.text();
   const data = JSON.parse(text);
-  // TODO: send to backend to import (can add later)
-  alert("Import not fully implemented yet");
+
+  try {
+    await api("/bookmarks/import", { method: "POST", body: data });
+    alert("✅ Import complete!");
+    refreshBookmarks();
+  } catch (err) {
+    alert("❌ Import failed: " + err.message);
+  }
 };
 
+// ---------------------- Request Admin ----------------------
 document.getElementById("request-btn").onclick = async () => {
   const msg = prompt("Enter your request message:");
   if (msg) {
@@ -88,6 +98,7 @@ document.getElementById("request-btn").onclick = async () => {
   }
 };
 
+// ---------------------- Role Setup ----------------------
 function setupRole(role) {
   if (role === "owner") {
     document.querySelectorAll(".owner-only").forEach(el => el.style.display = "inline-block");
