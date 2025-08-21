@@ -14,6 +14,18 @@ function fetchChildren(db, parentId){
   }));
 }
 
+// helper: insert nodes recursively
+function insertNode(db, node, parent_id = null, pos = 0) {
+  const id = nanoid();
+  db.prepare(
+    'INSERT INTO bookmarks(id,parent_id,type,title,url,position) VALUES (?,?,?,?,?,?)'
+  ).run(id, parent_id, node.type, node.title, node.url || null, pos);
+
+  if (node.type === 'folder' && node.children) {
+    node.children.forEach((ch, i) => insertNode(db, ch, id, i));
+  }
+}
+
 router.get('/', requireAny('guest','owner'), (req,res)=>{
   const roots = fetchChildren(req.db, null);
   res.json({ root: { title: 'Root', type:'folder', children: roots }});
@@ -24,6 +36,23 @@ router.post('/export', requireAny('guest','owner'), (req,res)=>{
   const payload = { title: 'Root', type:'folder', children: roots };
   res.setHeader('Content-Disposition', 'attachment; filename="bookmarks.json"');
   res.json(payload);
+});
+
+router.post('/import', requireRole('owner'), (req,res)=>{
+  const data = req.body;
+  if (!data || data.type !== 'folder') {
+    return res.status(400).json({ error: 'invalid format' });
+  }
+
+  // clear old
+  req.db.prepare('DELETE FROM bookmarks').run();
+
+  // insert root children
+  if (data.children) {
+    data.children.forEach((ch, i) => insertNode(req.db, ch, null, i));
+  }
+
+  res.json({ ok: true });
 });
 
 router.post('/', requireRole('owner'), (req,res)=>{
