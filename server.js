@@ -1,4 +1,3 @@
-
 import 'dotenv/config';
 import express from 'express';
 import cookieSession from 'cookie-session';
@@ -21,12 +20,10 @@ app.use(cookieSession({
   sameSite: 'lax'
 }));
 
-// Database at persistent disk for Render
-const DB_PATH = process.env.DB_PATH || '/var/data/app.db';
-if (DB_PATH.startsWith('/var/data')) {
-  // ensure dir exists
-  fs.mkdirSync('/var/data', { recursive: true });
-}
+// ✅ Use local folder instead of /var/data (free)
+const DB_PATH = process.env.DB_PATH || './data/app.db';
+fs.mkdirSync('./data', { recursive: true });  // make sure ./data exists
+
 const db = new Database(DB_PATH);
 const initSql = fs.readFileSync('./db/init.sql','utf-8');
 db.exec(initSql);
