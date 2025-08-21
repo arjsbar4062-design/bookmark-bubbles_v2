@@ -1,5 +1,88 @@
 body {
   background: #0b0f14;
   color: #e6ebf2;
-  font-family: sans-serif;
+  font-family: "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
 }
+
+.hidden { display: none; }
+
+#login-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+#login-screen input, #login-screen select, #login-screen button {
+  margin: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: none;
+  background: #1c2230;
+  color: #fff;
+  font-size: 1em;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+header {
+  background: #121821;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #8ef9f9;
+  box-shadow: 0 0 10px #8ef9f9;
+}
+
+#toolbar {
+  padding: 10px;
+  background: #161d29;
+  display: flex;
+  gap: 8px;
+}
+
+#toolbar button {
+  border: none;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: #222c3c;
+  color: #8ef9f9;
+  cursor: pointer;
+  box-shadow: 0 0 10px #8ef9f9;
+}
+
+#toolbar button:hover {
+  background: #2e3a52;
+}
+
+#bookmark-tree {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.bubble {
+  padding: 10px 15px;
+  border-radius: 20px;
+  margin: 6px 0;
+  background: #1c2230;
+  box-shadow: 0 0 10px #8ef9f9;
+  cursor: pointer;
+}
+
+.bubble.folder {
+  background: #252e42;
+}
+
+.bubble:hover {
+  background: #2e3a52;
+}
+
