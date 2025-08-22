@@ -1,32 +1,34 @@
 import { nanoid } from 'nanoid';
-import { JSDOM } from 'jsdom';
 
-// recursively parse <DL><DT><A> structure
-function parseDL(dl) {
-  const items = [];
-  dl.querySelectorAll(':scope > DT').forEach(dt => {
-    const a = dt.querySelector('a');
-    const h3 = dt.querySelector('h3');
-    if (a) {
-      items.push({
+// Parse Netscape bookmarks export with regex
+function parseBookmarks(html) {
+  const lines = html.split('\n');
+  const stack = [{ title: 'Root', type: 'folder', children: [] }];
+  
+  lines.forEach(line => {
+    line = line.trim();
+    if (line.startsWith('<DT><H3')) {
+      const title = line.replace(/.*<H3[^>]*>(.*?)<\/H3>.*/, '$1');
+      const folder = { type: 'folder', title, children: [] };
+      stack[stack.length - 1].children.push(folder);
+      stack.push(folder);
+    } else if (line.startsWith('</DL>')) {
+      stack.pop();
+    } else if (line.startsWith('<DT><A')) {
+      const urlMatch = line.match(/HREF="([^"]+)"/i);
+      const title = line.replace(/.*<A[^>]*>(.*?)<\/A>.*/, '$1');
+      stack[stack.length - 1].children.push({
         type: 'link',
-        title: a.textContent,
-        url: a.href
+        title,
+        url: urlMatch ? urlMatch[1] : null
       });
-    } else if (h3) {
-      const folder = { type: 'folder', title: h3.textContent, children: [] };
-      const childDL = dt.querySelector('dl');
-      if (childDL) folder.children = parseDL(childDL);
-      items.push(folder);
     }
   });
-  return items;
+  return stack[0];
 }
 
 export async function seedBookmarks(db, html) {
-  const dom = new JSDOM(html);
-  const dl = dom.window.document.querySelector('dl');
-  const root = { type: 'folder', title: 'Root', children: parseDL(dl) };
+  const root = parseBookmarks(html);
 
   function insertNode(node, parent_id = null, pos = 0) {
     const id = nanoid();
