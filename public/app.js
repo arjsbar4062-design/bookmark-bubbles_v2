@@ -1,110 +1,103 @@
-async function api(path, options = {}) {
+// Simple API helper
+const api = async (path, options = {}) => {
   const res = await fetch("/api" + path, {
+    method: options.method || "GET",
     headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    let msg = "Request failed";
+    try { msg = (await res.json()).error; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
-}
+};
 
-async function refreshBookmarks() {
-  const data = await api("/bookmarks");
-  const tree = document.getElementById("bookmark-tree");
-  tree.innerHTML = "";
-  renderNode(data.root, tree);
-}
+// Screen elements
+const loginForm = document.getElementById("login-form");
+const loginError = document.getElementById("login-error");
+const loginScreen = document.getElementById("login-screen");
+const appScreen = document.getElementById("app-screen");
+const logoutBtn = document.getElementById("logout");
+const treeContainer = document.getElementById("bookmark-tree");
 
-function renderNode(node, parentEl) {
-  if (node.type === "folder" || node.title === "Root") {
-    const div = document.createElement("div");
-    div.className = "bubble folder";
-    div.textContent = node.title;
-    parentEl.appendChild(div);
+let currentRole = null;
 
-    if (node.children) {
-      const childContainer = document.createElement("div");
-      childContainer.style.marginLeft = "20px";
-      parentEl.appendChild(childContainer);
-      node.children.forEach(ch => renderNode(ch, childContainer));
+// Render bookmark tree recursively
+function renderTree(nodes, depth = 0) {
+  const ul = document.createElement("ul");
+  ul.style.listStyle = "none";
+  ul.style.paddingLeft = depth ? "20px" : "0";
+
+  nodes.forEach(node => {
+    const li = document.createElement("li");
+    li.style.margin = "5px 0";
+
+    if (node.type === "folder") {
+      const span = document.createElement("span");
+      span.textContent = "📂 " + node.title;
+      span.style.cursor = "pointer";
+      span.classList.add("bubble");
+
+      const childContainer = renderTree(node.children || [], depth + 1);
+      childContainer.style.display = "none";
+
+      span.addEventListener("click", () => {
+        childContainer.style.display = childContainer.style.display === "none" ? "block" : "none";
+      });
+
+      li.appendChild(span);
+      li.appendChild(childContainer);
+    } else {
+      const a = document.createElement("a");
+      a.href = node.url;
+      a.textContent = "🔗 " + node.title;
+      a.target = "_blank";
+      a.classList.add("bubble");
+      li.appendChild(a);
     }
-  } else {
-    const div = document.createElement("a");
-    div.className = "bubble link";
-    div.href = node.url;
-    div.textContent = node.title;
-    div.target = "_blank";
-    parentEl.appendChild(div);
+
+    ul.appendChild(li);
+  });
+  return ul;
+}
+
+// Load bookmarks from backend
+async function loadBookmarks() {
+  try {
+    const data = await api("/bookmarks");
+    treeContainer.innerHTML = "";
+    const tree = renderTree(data);
+    treeContainer.appendChild(tree);
+  } catch (err) {
+    treeContainer.innerHTML = `<div class="error">⚠️ Failed to load bookmarks: ${err.message}</div>`;
   }
 }
 
-// ---------------------- Login / Logout ----------------------
-document.getElementById("login-btn").onclick = async () => {
+// Handle login form
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
   const role = document.getElementById("role").value;
   const password = document.getElementById("password").value;
-  try {
-    await api("/login", { method: "POST", body: { role, password } });
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
-    setupRole(role);
-    refreshBookmarks();
-  } catch (e) {
-    document.getElementById("login-error").textContent = "❌ Login failed";
-  }
-};
-
-document.getElementById("logout-btn").onclick = async () => {
-  await api("/logout", { method: "POST" });
-  location.reload();
-};
-
-// ---------------------- Export ----------------------
-document.getElementById("export-btn").onclick = async () => {
-  const res = await fetch("/api/bookmarks/export", { method: "POST" });
-  const blob = await res.blob();
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "bookmarks.json";
-  a.click();
-};
-
-// ---------------------- Import ----------------------
-document.getElementById("import-btn").onclick = () => {
-  document.getElementById("import-file").click();
-};
-
-document.getElementById("import-file").onchange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const text = await file.text();
-  const data = JSON.parse(text);
 
   try {
-    await api("/bookmarks/import", { method: "POST", body: data });
-    alert("✅ Import complete!");
-    refreshBookmarks();
+    const res = await api("/login", {
+      method: "POST",
+      body: { role, password },
+    });
+    currentRole = res.role;
+    loginScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    await loadBookmarks();
   } catch (err) {
-    alert("❌ Import failed: " + err.message);
+    loginError.textContent = "❌ Login failed: " + err.message;
   }
-};
+});
 
-// ---------------------- Request Admin ----------------------
-document.getElementById("request-btn").onclick = async () => {
-  const msg = prompt("Enter your request message:");
-  if (msg) {
-    await api("/requests", { method: "POST", body: { message: msg } });
-    alert("Request sent!");
-  }
-};
-
-// ---------------------- Role Setup ----------------------
-function setupRole(role) {
-  if (role === "owner") {
-    document.querySelectorAll(".owner-only").forEach(el => el.style.display = "inline-block");
-    document.querySelectorAll(".guest-only").forEach(el => el.style.display = "none");
-  } else {
-    document.querySelectorAll(".owner-only").forEach(el => el.style.display = "none");
-    document.querySelectorAll(".guest-only").forEach(el => el.style.display = "inline-block");
-  }
-}
+// Logout
+logoutBtn.addEventListener("click", async () => {
+  await api("/logout", { method: "POST" });
+  currentRole = null;
+  appScreen.classList.add("hidden");
+  loginScreen.classList.remove("hidden");
+});
