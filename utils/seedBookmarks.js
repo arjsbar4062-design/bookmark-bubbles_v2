@@ -13,7 +13,7 @@ function parseBookmarks(html) {
       stack[stack.length - 1].children.push(folder);
       stack.push(folder);
     } else if (line.startsWith('</DL>')) {
-      stack.pop();
+      if (stack.length > 1) stack.pop();
     } else if (line.startsWith('<DT><A')) {
       const urlMatch = line.match(/HREF="([^"]+)"/i);
       const title = line.replace(/.*<A[^>]*>(.*?)<\/A>.*/, '$1');
@@ -24,11 +24,16 @@ function parseBookmarks(html) {
       });
     }
   });
-  return stack[0];
+  return stack[0]; // always return root
 }
 
 export async function seedBookmarks(db, html) {
   const root = parseBookmarks(html);
+
+  if (!root || !root.children) {
+    console.error("⚠️ No bookmarks parsed from Stuff v8.html");
+    return;
+  }
 
   function insertNode(node, parent_id = null, pos = 0) {
     const id = nanoid();
