@@ -1,39 +1,33 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8">
   <title>Bookmark Bubbles</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="login-screen">
+  <div id="login-screen" class="screen">
     <h1>🔮 Bookmark Bubbles</h1>
-    <p>Login as Guest or Owner</p>
-    <input id="password" type="password" placeholder="Enter password"/>
-    <select id="role">
-      <option value="guest">Guest</option>
-      <option value="owner">Owner</option>
-    </select>
-    <button id="login-btn">Login</button>
-    <div id="login-error"></div>
+    <form id="login-form">
+      <label for="role">Role:</label>
+      <select id="role" name="role">
+        <option value="guest">Guest</option>
+        <option value="owner">Owner</option>
+      </select>
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password" required>
+
+      <button type="submit">Login</button>
+    </form>
+    <div id="login-error" class="error"></div>
   </div>
 
-  <div id="app" class="hidden">
+  <div id="app-screen" class="screen hidden">
     <header>
-      <h1>🔮 Bookmark Bubbles</h1>
-      <button id="logout-btn">Logout</button>
+      <h2>📚 Bookmark Tree</h2>
+      <button id="logout">Logout</button>
     </header>
-
-    <div id="toolbar">
-      <button id="add-folder-btn" class="owner-only">➕ Folder</button>
-      <button id="add-link-btn" class="owner-only">➕ Link</button>
-      <button id="delete-btn" class="owner-only">🗑 Delete</button>
-      <button id="export-btn">📤 Export</button>
-      <button id="import-btn" class="owner-only">📥 Import</button>
-      <button id="request-btn" class="guest-only">🙋 Request Admin</button>
-      <input type="file" id="import-file" class="hidden"/>
-    </div>
-
     <div id="bookmark-tree"></div>
   </div>
 
