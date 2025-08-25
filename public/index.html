@@ -6,30 +6,37 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Login Screen -->
   <div id="login-screen" class="screen">
-    <h1>🔮 Bookmark Bubbles</h1>
-    <form id="login-form">
-      <label for="role">Role:</label>
-      <select id="role" name="role">
-        <option value="guest">Guest</option>
-        <option value="owner">Owner</option>
-      </select>
+    <div class="card">
+      <h1>Bookmark Bubbles</h1>
+      <form id="login-form">
+        <label for="role">Role:</label>
+        <select id="role" name="role">
+          <option value="guest">Guest</option>
+          <option value="owner">Owner</option>
+        </select>
 
-      <label for="password">Password:</label>
-      <input type="password" id="password" name="password" required>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
 
-      <button type="submit">Login</button>
-    </form>
-    <div id="login-error" class="error"></div>
+        <button type="submit">Login</button>
+      </form>
+      <div id="login-error" class="error"></div>
+    </div>
   </div>
 
+  <!-- App Screen -->
   <div id="app-screen" class="screen hidden">
-    <header>
-      <h2>📚 Bookmark Tree</h2>
+    <header class="card">
+      <h2>Bookmark Tree</h2>
       <button id="logout">Logout</button>
     </header>
-    <div id="bookmark-tree"></div>
+    <div id="bookmark-tree" class="card"></div>
   </div>
+
+  <!-- Popup -->
+  <div id="popup"></div>
 
   <script src="app.js"></script>
 </body>
