@@ -1,95 +1,132 @@
-/* Global dark retro theme */
+/* Bubble Seelen UI Theme */
 body {
   margin: 0;
-  font-family: 'Trebuchet MS', sans-serif;
-  background: #111;
-  color: #eee;
-}
-
-/* Screen switcher */
-.screen {
+  font-family: "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #f5f5f5;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   height: 100vh;
 }
+
+/* Hide/show screens */
+.screen {
+  width: 100%;
+  max-width: 500px;
+}
 .hidden {
-  display: none !important;
+  display: none;
 }
 
-/* Retro glowing bubble look */
+/* Bubble cards */
+.card {
+  background: #161b22;
+  border-radius: 20px;
+  padding: 30px;
+  margin: 20px auto;
+  box-shadow:
+    8px 8px 16px rgba(0,0,0,0.6),
+    -8px -8px 16px rgba(255,255,255,0.05);
+}
+
+/* Neon glow headings */
 h1, h2 {
-  color: #fff;
-  text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 30px #0ff;
+  text-align: center;
+  color: #00e0ff;
+  text-shadow: 0 0 10px #00e0ff, 0 0 20px #0099ff;
+  margin-bottom: 20px;
 }
 
-form, header {
-  background: rgba(30,30,30,0.9);
-  padding: 20px;
-  border-radius: 15px;
-  box-shadow: 0 0 15px rgba(0,255,255,0.5);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+/* Labels + inputs */
 label {
-  font-size: 0.9em;
-  color: #aaa;
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: bold;
+  color: #9cdcfe;
 }
-
 input, select {
-  padding: 8px 12px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
   border: none;
-  border-radius: 8px;
-  background: #222;
-  color: #eee;
+  background: #21262d;
+  color: #f5f5f5;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.6),
+    inset -2px -2px 6px rgba(255,255,255,0.05);
+}
+input:focus, select:focus {
   outline: none;
-  box-shadow: inset 0 0 5px rgba(0,255,255,0.4);
+  box-shadow: 0 0 8px #00e0ff;
 }
 
+/* Bubble buttons */
 button {
-  padding: 10px 15px;
+  margin-top: 15px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #0ff, #08f);
-  color: #111;
+  border-radius: 12px;
+  background: #1f6feb;
+  color: #fff;
   font-weight: bold;
   cursor: pointer;
-  box-shadow: 0 0 10px #0ff, 0 0 20px #08f;
   transition: transform 0.1s, box-shadow 0.3s;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.6),
+    inset -2px -2px 6px rgba(255,255,255,0.05);
 }
-button:hover {
+button:hover:enabled {
   transform: scale(1.05);
-  box-shadow: 0 0 15px #0ff, 0 0 25px #08f;
+  box-shadow: 0 0 12px #00e0ff;
+}
+button:disabled,
+button.disabled-btn {
+  background: #444;
+  color: #aaa;
+  cursor: not-allowed;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.7),
+    inset -2px -2px 6px rgba(255,255,255,0.02);
 }
 
-/* Error message */
+/* Bubble links */
+a.bubble {
+  padding: 6px 12px;
+  background: #21262d;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #58a6ff;
+  transition: background 0.2s;
+}
+a.bubble:hover {
+  background: #30363d;
+}
+
+/* Error messages */
 .error {
-  margin-top: 10px;
+  margin-top: 12px;
   color: #f55;
   font-weight: bold;
-  text-shadow: 0 0 5px #f00;
+  text-align: center;
 }
 
-/* App screen */
-#app-screen {
-  align-items: stretch;
-}
-header {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin: 20px;
-}
-
-#bookmark-tree {
-  margin: 20px;
-  padding: 20px;
-  background: rgba(20,20,20,0.9);
+/* Bubble popup */
+#popup {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #161b22;
+  color: #fff;
+  padding: 12px 18px;
   border-radius: 15px;
-  box-shadow: inset 0 0 10px rgba(0,255,255,0.4);
-  min-height: 400px;
-  overflow-y: auto;
+  box-shadow: 0 0 15px #f55;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+#popup.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
