@@ -1,4 +1,4 @@
-// Simple API helper
+// --- helper api ---
 const api = async (path, options = {}) => {
   const res = await fetch("/api" + path, {
     method: options.method || "GET",
@@ -13,7 +13,7 @@ const api = async (path, options = {}) => {
   return res.json();
 };
 
-// Screen elements
+// --- screen refs ---
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
 const loginScreen = document.getElementById("login-screen");
@@ -23,7 +23,7 @@ const treeContainer = document.getElementById("bookmark-tree");
 
 let currentRole = null;
 
-// Render bookmark tree recursively
+// --- render tree ---
 function renderTree(nodes, depth = 0) {
   const ul = document.createElement("ul");
   ul.style.listStyle = "none";
@@ -43,11 +43,39 @@ function renderTree(nodes, depth = 0) {
       childContainer.style.display = "none";
 
       span.addEventListener("click", () => {
-        childContainer.style.display = childContainer.style.display === "none" ? "block" : "none";
+        childContainer.style.display =
+          childContainer.style.display === "none" ? "block" : "none";
       });
 
       li.appendChild(span);
       li.appendChild(childContainer);
+
+      // owner buttons
+      if (currentRole === "owner") {
+        const addBtn = document.createElement("button");
+        addBtn.textContent = "➕";
+        addBtn.onclick = async () => {
+          const title = prompt("New bookmark title:");
+          const url = prompt("Bookmark URL (leave empty for folder):");
+          if (!title) return;
+          const type = url ? "link" : "folder";
+          await api("/bookmarks", {
+            method: "POST",
+            body: { parent_id: node.id, type, title, url },
+          });
+          loadBookmarks();
+        };
+        li.appendChild(addBtn);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑️";
+        delBtn.onclick = async () => {
+          if (!confirm("Delete this folder and its contents?")) return;
+          await api("/bookmarks/" + node.id, { method: "DELETE" });
+          loadBookmarks();
+        };
+        li.appendChild(delBtn);
+      }
     } else {
       const a = document.createElement("a");
       a.href = node.url;
@@ -55,6 +83,32 @@ function renderTree(nodes, depth = 0) {
       a.target = "_blank";
       a.classList.add("bubble");
       li.appendChild(a);
+
+      // owner buttons
+      if (currentRole === "owner") {
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "✏️";
+        editBtn.onclick = async () => {
+          const newTitle = prompt("Edit title:", node.title);
+          const newUrl = prompt("Edit URL:", node.url);
+          if (!newTitle) return;
+          await api("/bookmarks/" + node.id, {
+            method: "PUT",
+            body: { title: newTitle, url: newUrl },
+          });
+          loadBookmarks();
+        };
+        li.appendChild(editBtn);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑️";
+        delBtn.onclick = async () => {
+          if (!confirm("Delete this link?")) return;
+          await api("/bookmarks/" + node.id, { method: "DELETE" });
+          loadBookmarks();
+        };
+        li.appendChild(delBtn);
+      }
     }
 
     ul.appendChild(li);
@@ -62,19 +116,19 @@ function renderTree(nodes, depth = 0) {
   return ul;
 }
 
-// Load bookmarks from backend
+// --- load bookmarks ---
 async function loadBookmarks() {
   try {
     const data = await api("/bookmarks");
     treeContainer.innerHTML = "";
-    const tree = renderTree(data);
+    const tree = renderTree(Array.isArray(data) ? data : []);
     treeContainer.appendChild(tree);
   } catch (err) {
     treeContainer.innerHTML = `<div class="error">⚠️ Failed to load bookmarks: ${err.message}</div>`;
   }
 }
 
-// Handle login form
+// --- login form ---
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const role = document.getElementById("role").value;
@@ -94,7 +148,7 @@ loginForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Logout
+// --- logout ---
 logoutBtn.addEventListener("click", async () => {
   await api("/logout", { method: "POST" });
   currentRole = null;
