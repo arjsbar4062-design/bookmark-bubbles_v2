@@ -1,81 +1,133 @@
-import express from 'express';
-import cookieSession from 'cookie-session';
-import Database from 'better-sqlite3';
-import bcrypt from 'bcrypt';
-import fs from 'fs';
-import path from 'path';
-import authRoutes from './routes/auth.js';
-import bookmarkRoutes from './routes/bookmarks.js';
-import requestRoutes from './routes/requests.js';
-import { seedBookmarks } from './utils/seedBookmarks.js';
+import express from "express";
+import cookieSession from "cookie-session";
+import Database from "better-sqlite3";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import bcrypt from "bcrypt";
+import jsdom from "jsdom";
+
+import authRoutes from "./routes/auth.js";
+import bookmarkRoutes from "./routes/bookmarks.js";
+import requestRoutes from "./routes/requests.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use(express.json({ limit: '5mb' }));
+// ✅ session config that works on Render free
 app.use(cookieSession({
-  name: 'sess',
-  keys: ['d71c'],   // ✅ your session secret key
+  name: "session",
+  keys: [process.env.SESSION_SECRET || "d71c"], // fallback to d71c
+  sameSite: "lax",
+  secure: false,
   httpOnly: true,
-  sameSite: 'lax'
+  maxAge: 24 * 60 * 60 * 1000, // 1 day
 }));
 
-// ✅ use ./data folder so it works free on Render
-const DB_PATH = './data/app.db';
-fs.mkdirSync('./data', { recursive: true });
-const db = new Database(DB_PATH);
+// --- database setup ---
+const dbFile = path.join(__dirname, "db", "data.db");
+const db = new Database(dbFile);
 
-// init DB schema
-const initSql = fs.readFileSync('./db/init.sql','utf-8');
-db.exec(initSql);
+db.exec(`
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
 
-// seed passwords (hardcoded now)
-function getSetting(key){
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  return row?.value ?? null;
-}
-function setSetting(key, value){
-  db.prepare(
-    'INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'
-  ).run(key, value);
-}
-async function ensurePasswordHashes(){
-  let ownerHash = getSetting('owner_hash');
-  let guestHash = getSetting('guest_hash');
-  if (!ownerHash || !guestHash){
-    const ownerPlain = "banana-owner";
-    const guestPlain = "guests-are-cool";
-    ownerHash = await bcrypt.hash(ownerPlain, 10);
-    guestHash = await bcrypt.hash(guestPlain, 10);
-    setSetting('owner_hash', ownerHash);
-    setSetting('guest_hash', guestHash);
-    console.log("✅ Seeded hardcoded passwords");
-  }
-}
-await ensurePasswordHashes();
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  parent_id TEXT,
+  type TEXT,
+  title TEXT,
+  url TEXT,
+  position INTEGER
+);
 
-// ✅ seed bookmarks from Stuff v8.html if DB empty
-const count = db.prepare("SELECT COUNT(*) as c FROM bookmarks").get().c;
-if (count === 0) {
-  console.log("📂 Seeding bookmarks from Stuff v8.html...");
-  const html = fs.readFileSync("./db/Stuff v8.html", "utf-8");
-  await seedBookmarks(db, html);
-  console.log("✅ Bookmarks seeded");
-}
+CREATE TABLE IF NOT EXISTS requests (
+  id TEXT PRIMARY KEY,
+  role TEXT,
+  created_at TEXT
+);
+`);
 
-// attach db to req
-app.use((req,res,next)=>{ req.db = db; next(); });
-
-app.use(express.static('public'));
-app.use('/api', authRoutes);
-app.use('/api/bookmarks', bookmarkRoutes);
-app.use('/api/requests', requestRoutes);
-
-// fallback to SPA
-app.get('*', (req,res)=>{
-  res.sendFile(path.resolve('public/index.html'));
+app.use((req, res, next) => {
+  req.db = db;
+  next();
 });
 
-app.listen(PORT, ()=>{
-  console.log(`🔮 Bookmark Bubbles running on http://localhost:${PORT}`);
+// --- seed passwords ---
+function setSetting(key, value) {
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").run(key, value);
+}
+
+function getSetting(key) {
+  const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key);
+  return row?.value ?? null;
+}
+
+(async () => {
+  if (!getSetting("owner_hash")) {
+    const hash = await bcrypt.hash("banana-owner", 10);
+    setSetting("owner_hash", hash);
+    console.log("✅ Seeded owner password");
+  }
+  if (!getSetting("guest_hash")) {
+    const hash = await bcrypt.hash("guests-are-cool", 10);
+    setSetting("guest_hash", hash);
+    console.log("✅ Seeded guest password");
+  }
+})();
+
+// --- seed bookmarks from Stuff v8.html ---
+import { JSDOM } from "jsdom";
+
+function seedBookmarks() {
+  const count = db.prepare("SELECT COUNT(*) as c FROM bookmarks").get().c;
+  if (count > 0) return; // already seeded
+
+  console.log("📂 Seeding bookmarks from Stuff v8.html...");
+
+  const filePath = path.join(__dirname, "db", "Stuff v8.html");
+  if (!fs.existsSync(filePath)) {
+    console.error("❌ Missing Stuff v8.html, skipping bookmark seed.");
+    return;
+  }
+  const html = fs.readFileSync(filePath, "utf-8");
+  const dom = new JSDOM(html);
+  const dtNodes = dom.window.document.querySelectorAll("DT");
+
+  let pos = 0;
+  dtNodes.forEach((dt) => {
+    const a = dt.querySelector("a");
+    const h3 = dt.querySelector("h3");
+    if (a) {
+      db.prepare("INSERT INTO bookmarks (id, parent_id, type, title, url, position) VALUES (?,?,?,?,?,?)")
+        .run(Date.now().toString(36) + Math.random(), null, "link", a.textContent, a.href, pos++);
+    } else if (h3) {
+      db.prepare("INSERT INTO bookmarks (id, parent_id, type, title, url, position) VALUES (?,?,?,?,?,?)")
+        .run(Date.now().toString(36) + Math.random(), null, "folder", h3.textContent, null, pos++);
+    }
+  });
+
+  console.log("✅ Bookmarks seeded");
+}
+seedBookmarks();
+
+// --- routes ---
+app.use("/api", authRoutes);
+app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/requests", requestRoutes);
+
+// --- fallback ---
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`🚀 Server running on http://localhost:${port}`);
 });
