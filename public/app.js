@@ -1,3 +1,61 @@
+// --- helper api with better error handling ---
+async function api(path, options = {}) {
+  const res = await fetch("/api" + path, {
+    method: options.method || "GET",
+    headers: { "Content-Type": "application/json" },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const data = await res.json();
+      msg = data.error || msg;
+    } catch {}
+
+    if (res.status === 403) {
+      showPopup("⛔ You don’t have permission (owner only).");
+    }
+
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// --- popup system ---
+function showPopup(message) {
+  const popup = document.getElementById("popup");
+  popup.textContent = message;
+  popup.className = "visible";
+  setTimeout(() => popup.classList.remove("visible"), 3000);
+}
+
+// --- refs ---
+const loginForm = document.getElementById("login-form");
+const loginError = document.getElementById("login-error");
+const loginScreen = document.getElementById("login-screen");
+const appScreen = document.getElementById("app-screen");
+const logoutBtn = document.getElementById("logout");
+const treeContainer = document.getElementById("bookmark-tree");
+const searchInput = document.getElementById("search");
+
+let currentRole = null;
+let allBookmarks = [];
+
+// --- make button ---
+function makeButton(label, action, enabled = true) {
+  const btn = document.createElement("button");
+  btn.textContent = label;
+  if (!enabled) {
+    btn.disabled = true;
+    btn.title = "Owner only";
+    btn.classList.add("disabled-btn");
+  } else {
+    btn.onclick = action;
+  }
+  return btn;
+}
+
 // --- render tree ---
 function renderTree(nodes, depth = 0, forceOpen = false) {
   const ul = document.createElement("ul");
@@ -17,7 +75,6 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
 
       const childContainer = renderTree(node.children || [], depth + 1, forceOpen);
 
-      // If searching, auto-expand folders with children
       if (forceOpen && node.children && node.children.length > 0) {
         childContainer.style.display = "block";
       } else {
@@ -88,12 +145,76 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
   return ul;
 }
 
+// --- filter function ---
+function filterTree(nodes, query) {
+  if (!query) return nodes;
+  query = query.toLowerCase();
+
+  return nodes
+    .map(node => {
+      if (node.type === "folder") {
+        const filteredChildren = filterTree(node.children || [], query);
+        if (node.title.toLowerCase().includes(query) || filteredChildren.length > 0) {
+          return { ...node, children: filteredChildren };
+        }
+      } else {
+        if (node.title.toLowerCase().includes(query) || (node.url && node.url.toLowerCase().includes(query))) {
+          return node;
+        }
+      }
+      return null;
+    })
+    .filter(n => n);
+}
+
+// --- load bookmarks ---
+async function loadBookmarks() {
+  try {
+    const data = await api("/bookmarks");
+    allBookmarks = Array.isArray(data) ? data : [];
+    renderFilteredTree();
+  } catch (err) {
+    treeContainer.innerHTML =
+      `<div class="error">⚠️ Failed to load bookmarks: ${err.message}</div>`;
+  }
+}
+
 // --- render based on search ---
 function renderFilteredTree() {
   const query = searchInput.value;
   const filtered = filterTree(allBookmarks, query);
   treeContainer.innerHTML = "";
-  // forceOpen = true when searching
   const tree = renderTree(filtered, 0, !!query);
   treeContainer.appendChild(tree);
 }
+
+// --- search input listener ---
+searchInput.addEventListener("input", renderFilteredTree);
+
+// --- login ---
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const role = document.getElementById("role").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    const res = await api("/login", {
+      method: "POST",
+      body: { role, password },
+    });
+    currentRole = res.role;
+    loginScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    await loadBookmarks();
+  } catch (err) {
+    loginError.textContent = "❌ Login failed: " + err.message;
+  }
+});
+
+// --- logout ---
+logoutBtn.addEventListener("click", async () => {
+  await api("/logout", { method: "POST" });
+  currentRole = null;
+  appScreen.classList.add("hidden");
+  loginScreen.classList.remove("hidden");
+});
