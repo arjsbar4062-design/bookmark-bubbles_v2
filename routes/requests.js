@@ -1,28 +1,35 @@
-import express from 'express';
-import { nanoid } from 'nanoid';
-import { requireAny, requireRole } from '../utils/authMiddleware.js';
+import express from "express";
+import { requireLogin, requireOwner } from "../utils/authMiddleware.js";
+import { nanoid } from "nanoid";
 
 const router = express.Router();
 
-router.post('/', requireAny('guest','owner'), (req,res)=>{
-  const { message } = req.body || {};
-  if (!message) return res.status(400).json({error:'message required'});
+// --- Guest & owner can view their own requests ---
+router.get("/", requireLogin, (req, res) => {
+  const rows = req.db.prepare("SELECT * FROM requests ORDER BY created_at DESC").all();
+  res.json(rows);
+});
+
+// --- Guest can create a request ---
+router.post("/", requireLogin, (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Message required" });
+
   const id = nanoid();
+  const user = req.session.role;
   const created_at = new Date().toISOString();
-  req.db.prepare('INSERT INTO requests(id,created_at,message,status) VALUES (?,?,?,?)')
-    .run(id, created_at, message, 'open');
-  res.json({ ok:true, id });
+
+  req.db.prepare(
+    "INSERT INTO requests (id, user, message, created_at) VALUES (?, ?, ?, ?)"
+  ).run(id, user, message, created_at);
+
+  res.json({ ok: true, id });
 });
 
-router.get('/', requireRole('owner'), (req,res)=>{
-  const rows = req.db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all();
-  res.json({ requests: rows });
-});
-
-router.post('/:id/resolve', requireRole('owner'), (req,res)=>{
-  const { id } = req.params;
-  req.db.prepare('UPDATE requests SET status = ? WHERE id = ?').run('resolved', id);
-  res.json({ ok:true });
+// --- Owner can delete a request ---
+router.delete("/:id", requireOwner, (req, res) => {
+  req.db.prepare("DELETE FROM requests WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 export default router;
