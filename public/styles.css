@@ -1,3 +1,162 @@
+/* Bubble Seelen UI Theme */
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #f5f5f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Screens */
+.screen {
+  width: 100%;
+  max-width: 600px;
+}
+.hidden {
+  display: none;
+}
+
+/* Bubble cards */
+.card {
+  background: #161b22;
+  border-radius: 20px;
+  padding: 30px;
+  margin: 20px auto;
+  box-shadow:
+    8px 8px 16px rgba(0,0,0,0.6),
+    -8px -8px 16px rgba(255,255,255,0.05);
+}
+
+/* Neon glow headings */
+h1, h2 {
+  text-align: center;
+  color: #00e0ff;
+  text-shadow: 0 0 10px #00e0ff, 0 0 20px #0099ff;
+  margin-bottom: 20px;
+}
+
+/* Labels + inputs */
+label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: bold;
+  color: #9cdcfe;
+}
+input, select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: none;
+  background: #21262d;
+  color: #f5f5f5;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.6),
+    inset -2px -2px 6px rgba(255,255,255,0.05);
+}
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 8px #00e0ff;
+}
+
+/* Bubble buttons */
+button {
+  margin: 4px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 12px;
+  background: #1f6feb;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.3s;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.6),
+    inset -2px -2px 6px rgba(255,255,255,0.05);
+}
+button:hover:enabled {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px #00e0ff;
+}
+button:disabled,
+button.disabled-btn {
+  background: #444;
+  color: #aaa;
+  cursor: not-allowed;
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.7),
+    inset -2px -2px 6px rgba(255,255,255,0.02);
+}
+
+/* Bubble links */
+a.bubble-label {
+  flex: 1;
+  color: #58a6ff;
+  text-decoration: none;
+  font-weight: 500;
+  margin-right: 10px;
+}
+a.bubble-label:hover {
+  color: #00e0ff;
+}
+
+/* Error messages */
+.error {
+  margin-top: 12px;
+  color: #f55;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Popup */
+#popup {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #161b22;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 15px;
+  box-shadow: 0 0 15px #f55;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+#popup.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Bubble cards for bookmarks */
+.bubble-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #161b22;
+  padding: 12px 16px;
+  border-radius: 15px;
+  margin: 6px 0;
+  box-shadow:
+    4px 4px 8px rgba(0,0,0,0.6),
+    -4px -4px 8px rgba(255,255,255,0.05);
+  transition: transform 0.1s, box-shadow 0.3s;
+}
+.bubble-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 12px #00e0ff;
+}
+
+/* Labels inside cards */
+.bubble-label {
+  flex: 1;
+  color: #f5f5f5;
+  font-weight: 500;
+  text-decoration: none;
+}
+
 /* Search bar */
 .search-card {
   padding: 15px;
