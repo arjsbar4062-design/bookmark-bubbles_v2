@@ -1,58 +1,79 @@
-// --- helper api with better error handling ---
+let currentRole = null;
+let allBookmarks = [];
+const loginScreen = document.getElementById("login-screen");
+const appScreen = document.getElementById("app-screen");
+const treeContainer = document.getElementById("bookmark-tree");
+const loginForm = document.getElementById("login-form");
+const roleSelect = document.getElementById("role");
+const passwordInput = document.getElementById("password");
+const logoutBtn = document.getElementById("logout");
+const searchInput = document.getElementById("search");
+
+// --- API helper with session cookies ---
 async function api(path, options = {}) {
   const res = await fetch("/api" + path, {
     method: options.method || "GET",
     headers: { "Content-Type": "application/json" },
     body: options.body ? JSON.stringify(options.body) : undefined,
+    credentials: "include"   // 🔑 ensures cookies are sent
   });
 
   if (!res.ok) {
     let msg = res.statusText;
-    try {
+    try { 
       const data = await res.json();
       msg = data.error || msg;
     } catch {}
-
     if (res.status === 403) {
       showPopup("⛔ You don’t have permission (owner only).");
     }
-
     throw new Error(msg);
   }
   return res.json();
 }
 
-// --- popup system ---
-function showPopup(message) {
-  const popup = document.getElementById("popup");
-  popup.textContent = message;
-  popup.className = "visible";
-  setTimeout(() => popup.classList.remove("visible"), 3000);
+// --- login ---
+loginForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const role = roleSelect.value;
+    const password = passwordInput.value;
+    const res = await api("/login", {
+      method: "POST",
+      body: { role, password }
+    });
+    currentRole = res.role;
+    loginScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    loadBookmarks();
+  } catch (err) {
+    showPopup("❌ Login failed: " + err.message);
+  }
+});
+
+// --- logout ---
+logoutBtn.addEventListener("click", async () => {
+  await api("/logout", { method: "POST" });
+  currentRole = null;
+  appScreen.classList.add("hidden");
+  loginScreen.classList.remove("hidden");
+});
+
+// --- popup helper ---
+function showPopup(msg) {
+  const popup = document.createElement("div");
+  popup.className = "popup";
+  popup.textContent = msg;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.remove(), 3000);
 }
 
-// --- refs ---
-const loginForm = document.getElementById("login-form");
-const loginError = document.getElementById("login-error");
-const loginScreen = document.getElementById("login-screen");
-const appScreen = document.getElementById("app-screen");
-const logoutBtn = document.getElementById("logout");
-const treeContainer = document.getElementById("bookmark-tree");
-const searchInput = document.getElementById("search");
-
-let currentRole = null;
-let allBookmarks = [];
-
 // --- make button ---
-function makeButton(label, action, enabled = true) {
+function makeButton(label, handler, show = true) {
+  if (!show) return document.createElement("span");
   const btn = document.createElement("button");
   btn.textContent = label;
-  if (!enabled) {
-    btn.disabled = true;
-    btn.title = "Owner only";
-    btn.classList.add("disabled-btn");
-  } else {
-    btn.onclick = action;
-  }
+  btn.addEventListener("click", handler);
   return btn;
 }
 
@@ -74,7 +95,6 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
       span.classList.add("bubble-label");
 
       const childContainer = renderTree(node.children || [], depth + 1, forceOpen);
-
       if (forceOpen && node.children && node.children.length > 0) {
         childContainer.style.display = "block";
       } else {
@@ -145,7 +165,7 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
   return ul;
 }
 
-// --- filter function ---
+// --- filter tree ---
 function filterTree(nodes, query) {
   if (!query) return nodes;
   query = query.toLowerCase();
@@ -190,31 +210,3 @@ function renderFilteredTree() {
 
 // --- search input listener ---
 searchInput.addEventListener("input", renderFilteredTree);
-
-// --- login ---
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const role = document.getElementById("role").value;
-  const password = document.getElementById("password").value;
-
-  try {
-    const res = await api("/login", {
-      method: "POST",
-      body: { role, password },
-    });
-    currentRole = res.role;
-    loginScreen.classList.add("hidden");
-    appScreen.classList.remove("hidden");
-    await loadBookmarks();
-  } catch (err) {
-    loginError.textContent = "❌ Login failed: " + err.message;
-  }
-});
-
-// --- logout ---
-logoutBtn.addEventListener("click", async () => {
-  await api("/logout", { method: "POST" });
-  currentRole = null;
-  appScreen.classList.add("hidden");
-  loginScreen.classList.remove("hidden");
-});
