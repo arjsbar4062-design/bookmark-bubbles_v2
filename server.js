@@ -1,12 +1,12 @@
 import express from "express";
-import cookieSession from "cookie-session";
-import Database from "better-sqlite3";
-import fs from "fs";
+import session from "cookie-session";
 import path from "path";
 import { fileURLToPath } from "url";
-import bcrypt from "bcrypt";
-import jsdom from "jsdom";
+import fs from "fs";
+import Database from "better-sqlite3";
+import { JSDOM } from "jsdom";
 
+// routes
 import authRoutes from "./routes/auth.js";
 import bookmarkRoutes from "./routes/bookmarks.js";
 import requestRoutes from "./routes/requests.js";
@@ -15,119 +15,122 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ session config that works on Render free
-app.use(cookieSession({
-  name: "session",
-  keys: [process.env.SESSION_SECRET || "d71c"], // fallback to d71c
-  sameSite: "lax",
-  secure: false,
-  httpOnly: true,
-  maxAge: 24 * 60 * 60 * 1000, // 1 day
-}));
+// --- Database setup ---
+const db = new Database("./db/data.sqlite");
+db.pragma("journal_mode = WAL");
 
-// --- database setup ---
-const dbFile = path.join(__dirname, "db", "data.db");
-const db = new Database(dbFile);
+// ensure settings table exists
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )
+`).run();
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY,
-  value TEXT
-);
+// ensure bookmarks table exists
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS bookmarks (
+    id TEXT PRIMARY KEY,
+    parent_id TEXT,
+    type TEXT,
+    title TEXT,
+    url TEXT,
+    position INTEGER
+  )
+`).run();
 
-CREATE TABLE IF NOT EXISTS bookmarks (
-  id TEXT PRIMARY KEY,
-  parent_id TEXT,
-  type TEXT,
-  title TEXT,
-  url TEXT,
-  position INTEGER
-);
+// ensure requests table exists
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS requests (
+    id TEXT PRIMARY KEY,
+    user TEXT,
+    message TEXT,
+    created_at TEXT
+  )
+`).run();
 
-CREATE TABLE IF NOT EXISTS requests (
-  id TEXT PRIMARY KEY,
-  role TEXT,
-  created_at TEXT
-);
-`);
-
+// attach db to every request
 app.use((req, res, next) => {
   req.db = db;
   next();
 });
 
-// --- seed passwords ---
-function setSetting(key, value) {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").run(key, value);
-}
+// middleware
+app.use(express.json());
+app.use(session({
+  name: "session",
+  keys: [process.env.SESSION_SECRET || "d71c"],
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+}));
 
-function getSetting(key) {
-  const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key);
-  return row?.value ?? null;
-}
+// routes
+app.use("/api", authRoutes);
+app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/requests", requestRoutes);
 
-(async () => {
-  if (!getSetting("owner_hash")) {
-    const hash = await bcrypt.hash("banana-owner", 10);
-    setSetting("owner_hash", hash);
-    console.log("✅ Seeded owner password");
-  }
-  if (!getSetting("guest_hash")) {
-    const hash = await bcrypt.hash("guests-are-cool", 10);
-    setSetting("guest_hash", hash);
-    console.log("✅ Seeded guest password");
-  }
-})();
+// serve frontend
+app.use(express.static(path.join(__dirname, "public")));
 
-// --- seed bookmarks from Stuff v8.html ---
-import { JSDOM } from "jsdom";
-
+// --- Seed bookmarks from Stuff v8.html on first run ---
 function seedBookmarks() {
   const count = db.prepare("SELECT COUNT(*) as c FROM bookmarks").get().c;
   if (count > 0) return; // already seeded
 
   console.log("📂 Seeding bookmarks from Stuff v8.html...");
 
-  const filePath = path.join(__dirname, "db", "Stuff v8.html");
-  if (!fs.existsSync(filePath)) {
-    console.error("❌ Missing Stuff v8.html, skipping bookmark seed.");
+  const htmlPath = path.join(__dirname, "db", "Stuff v8.html");
+  if (!fs.existsSync(htmlPath)) {
+    console.error("⚠️ Stuff v8.html not found in ./db/");
     return;
   }
-  const html = fs.readFileSync(filePath, "utf-8");
+
+  const html = fs.readFileSync(htmlPath, "utf8");
   const dom = new JSDOM(html);
-  const dtNodes = dom.window.document.querySelectorAll("DT");
+  const dt = dom.window.document.querySelector("DL");
+
+  function insertNode(node, parentId, position = 0) {
+    if (!node) return;
+
+    if (node.tagName === "DT") {
+      const a = node.querySelector("a");
+      const h3 = node.querySelector("h3");
+      if (a) {
+        db.prepare(`INSERT INTO bookmarks (id, parent_id, type, title, url, position)
+                    VALUES (lower(hex(randomblob(16))), ?, 'link', ?, ?, ?)`)
+          .run(parentId, a.textContent, a.href, position);
+      } else if (h3) {
+        const id = db.prepare(`SELECT lower(hex(randomblob(16))) as id`).get().id;
+        db.prepare(`INSERT INTO bookmarks (id, parent_id, type, title, url, position)
+                    VALUES (?, ?, 'folder', ?, NULL, ?)`)
+          .run(id, parentId, h3.textContent, position);
+        const dl = node.querySelector("DL");
+        if (dl) {
+          let i = 0;
+          dl.childNodes.forEach(ch => {
+            if (ch.tagName === "DT") {
+              insertNode(ch, id, i++);
+            }
+          });
+        }
+      }
+    }
+  }
 
   let pos = 0;
-  dtNodes.forEach((dt) => {
-    const a = dt.querySelector("a");
-    const h3 = dt.querySelector("h3");
-    if (a) {
-      db.prepare("INSERT INTO bookmarks (id, parent_id, type, title, url, position) VALUES (?,?,?,?,?,?)")
-        .run(Date.now().toString(36) + Math.random(), null, "link", a.textContent, a.href, pos++);
-    } else if (h3) {
-      db.prepare("INSERT INTO bookmarks (id, parent_id, type, title, url, position) VALUES (?,?,?,?,?,?)")
-        .run(Date.now().toString(36) + Math.random(), null, "folder", h3.textContent, null, pos++);
+  dt.childNodes.forEach(ch => {
+    if (ch.tagName === "DT") {
+      insertNode(ch, null, pos++);
     }
   });
 
   console.log("✅ Bookmarks seeded");
 }
+
 seedBookmarks();
 
-// --- routes ---
-app.use("/api", authRoutes);
-app.use("/api/bookmarks", bookmarkRoutes);
-app.use("/api/requests", requestRoutes);
-
-// --- fallback ---
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`🚀 Server running on http://localhost:${port}`);
+// --- Start server ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
