@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { JSDOM } from "jsdom";
+import bcrypt from "bcrypt";
 
 // routes
 import authRoutes from "./routes/auth.js";
@@ -49,6 +50,24 @@ db.prepare(`
     created_at TEXT
   )
 `).run();
+
+// --- Seed hardcoded passwords if not present ---
+function seedPasswords() {
+  const ownerHash = db.prepare("SELECT value FROM settings WHERE key = 'owner_hash'").get();
+  const guestHash = db.prepare("SELECT value FROM settings WHERE key = 'guest_hash'").get();
+
+  if (!ownerHash) {
+    const hash = bcrypt.hashSync("banana-owner", 10);
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run("owner_hash", hash);
+    console.log("✅ Seeded owner password");
+  }
+  if (!guestHash) {
+    const hash = bcrypt.hashSync("guests-are-cool", 10);
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run("guest_hash", hash);
+    console.log("✅ Seeded guest password");
+  }
+}
+seedPasswords();
 
 // attach db to every request
 app.use((req, res, next) => {
