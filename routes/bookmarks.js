@@ -1,67 +1,58 @@
 import express from "express";
-import { requireRole, requireAny } from "../utils/authMiddleware.js";
+import { requireLogin, requireOwner } from "../utils/authMiddleware.js";
+import { nanoid } from "nanoid";
 
 const router = express.Router();
 
-// Helper: build tree from flat rows
-function buildTree(rows) {
-  const map = {};
-  rows.forEach(r => {
-    map[r.id] = { ...r, children: [] };
-  });
-  const tree = [];
-  rows.forEach(r => {
-    if (r.parent_id && map[r.parent_id]) {
-      map[r.parent_id].children.push(map[r.id]);
-    } else {
-      tree.push(map[r.id]);
-    }
-  });
-  return tree;
-}
-
-// 📂 Get bookmark tree (guest + owner)
-router.get("/", requireAny(["guest", "owner"]), (req, res) => {
-  const rows = req.db.prepare(
-    "SELECT id, parent_id, type, title, url, position FROM bookmarks ORDER BY position"
-  ).all();
-  res.json(buildTree(rows)); // ✅ always array
+// --- Get all bookmarks (any logged in user) ---
+router.get("/", requireLogin, (req, res) => {
+  const rows = req.db.prepare("SELECT * FROM bookmarks ORDER BY position").all();
+  res.json(buildTree(rows));
 });
 
-// ➕ Add bookmark (owner only)
-router.post("/", requireRole("owner"), (req, res) => {
-  const { parent_id, type, title, url, position } = req.body;
-  if (!type || !title) {
-    return res.status(400).json({ error: "type and title required" });
-  }
-  const id = Date.now().toString(36); // simple ID
+// --- Add bookmark/folder (owner only) ---
+router.post("/", requireOwner, (req, res) => {
+  const { parent_id, type, title, url } = req.body;
+  const id = nanoid();
+  const position = req.db.prepare("SELECT COUNT(*) as c FROM bookmarks WHERE parent_id IS ?").get(parent_id || null).c;
   req.db.prepare(
-    "INSERT INTO bookmarks (id, parent_id, type, title, url, position) VALUES (?,?,?,?,?,?)"
-  ).run(id, parent_id || null, type, title, url || null, position || 0);
+    `INSERT INTO bookmarks (id, parent_id, type, title, url, position)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, parent_id || null, type, title, url || null, position);
   res.json({ ok: true, id });
 });
 
-// ✏️ Edit bookmark (owner only)
-router.put("/:id", requireRole("owner"), (req, res) => {
+// --- Update bookmark (owner only) ---
+router.put("/:id", requireOwner, (req, res) => {
   const { title, url } = req.body;
   req.db.prepare(
-    "UPDATE bookmarks SET title = ?, url = ? WHERE id = ?"
+    `UPDATE bookmarks SET title = ?, url = ? WHERE id = ?`
   ).run(title, url, req.params.id);
   res.json({ ok: true });
 });
 
-// 🗑️ Delete bookmark (owner only)
-router.delete("/:id", requireRole("owner"), (req, res) => {
-  req.db.prepare("DELETE FROM bookmarks WHERE id = ?").run(req.params.id);
+// --- Delete bookmark/folder (owner only) ---
+router.delete("/:id", requireOwner, (req, res) => {
+  const id = req.params.id;
+  req.db.prepare("DELETE FROM bookmarks WHERE id = ? OR parent_id = ?").run(id, id);
   res.json({ ok: true });
 });
 
-// 📤 Export bookmarks (guest + owner)
-router.get("/export", requireAny(["guest", "owner"]), (req, res) => {
-  const rows = req.db.prepare(
-    "SELECT id, parent_id, type, title, url, position FROM bookmarks ORDER BY position"
-  ).all();
-  res.json(buildTree(rows));
-});
+// --- Helper: build nested tree ---
+function buildTree(rows) {
+  const map = {};
+  const roots = [];
+  rows.forEach(r => {
+    map[r.id] = { ...r, children: [] };
+  });
+  rows.forEach(r => {
+    if (r.parent_id && map[r.parent_id]) {
+      map[r.parent_id].children.push(map[r.id]);
+    } else {
+      roots.push(map[r.id]);
+    }
+  });
+  return roots;
+}
 
 export default router;
