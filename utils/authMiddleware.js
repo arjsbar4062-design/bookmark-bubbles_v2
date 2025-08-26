@@ -1,23 +1,16 @@
-export function requireRole(role) {
-  return (req, res, next) => {
-    if (!req.session || !req.session.role) {
-      return res.status(401).json({error: 'Not logged in'});
-    }
-    if (req.session.role !== role) {
-      return res.status(403).json({error: 'Forbidden'});
-    }
-    next();
-  };
+// utils/authMiddleware.js
+
+export function requireOwner(req, res, next) {
+  if (req.session?.role === "owner") {
+    return next();
+  }
+  res.status(403).json({ error: "Forbidden" });
 }
 
-export function requireAny(...roles){
-  return (req, res, next) => {
-    if (!req.session || !req.session.role) {
-      return res.status(401).json({error: 'Not logged in'});
-    }
-    if (!roles.includes(req.session.role)) {
-      return res.status(403).json({error: 'Forbidden'});
-    }
-    next();
-  };
+export function requireLogin(req, res, next) {
+  if (req.session?.role) {
+    return next();
+  }
+  res.status(401).json({ error: "Unauthorized" });
 }
+
