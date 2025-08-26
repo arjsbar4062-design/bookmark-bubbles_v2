@@ -1,14 +1,49 @@
-<!-- App Screen -->
-<div id="app-screen" class="screen hidden">
-  <header class="card">
-    <h2>Bookmark Tree</h2>
-    <button id="logout">Logout</button>
-  </header>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bookmark Bubbles</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen">
+    <div class="card">
+      <h1>Bookmark Bubbles</h1>
+      <form id="login-form">
+        <label for="role">Role:</label>
+        <select id="role" name="role">
+          <option value="guest">Guest</option>
+          <option value="owner">Owner</option>
+        </select>
 
-  <!-- 🔍 Search bar -->
-  <div class="card search-card">
-    <input type="text" id="search" placeholder="🔍 Search bookmarks...">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Login</button>
+      </form>
+      <div id="login-error" class="error"></div>
+    </div>
   </div>
 
-  <div id="bookmark-tree" class="card"></div>
-</div>
+  <!-- App Screen -->
+  <div id="app-screen" class="screen hidden">
+    <header class="card">
+      <h2>Bookmark Tree</h2>
+      <button id="logout">Logout</button>
+    </header>
+
+    <!-- 🔍 Search bar -->
+    <div class="card search-card">
+      <input type="text" id="search" placeholder="🔍 Search bookmarks...">
+    </div>
+
+    <div id="bookmark-tree" class="card"></div>
+  </div>
+
+  <!-- Popup -->
+  <div id="popup"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
