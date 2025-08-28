@@ -15,7 +15,7 @@ async function api(path, options = {}) {
     method: options.method || "GET",
     headers: { "Content-Type": "application/json" },
     body: options.body ? JSON.stringify(options.body) : undefined,
-    credentials: "include"   // 🔑 ensures cookies are sent
+    credentials: "include"   // 🔑 keep session cookies
   });
 
   if (!res.ok) {
@@ -77,7 +77,7 @@ function makeButton(label, handler, show = true) {
   return btn;
 }
 
-// --- render tree ---
+// --- render tree (fixed) ---
 function renderTree(nodes, depth = 0, forceOpen = false) {
   const ul = document.createElement("ul");
   ul.style.listStyle = "none";
@@ -94,12 +94,9 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
       span.style.cursor = "pointer";
       span.classList.add("bubble-label");
 
+      // nested children
       const childContainer = renderTree(node.children || [], depth + 1, forceOpen);
-      if (forceOpen && node.children && node.children.length > 0) {
-        childContainer.style.display = "block";
-      } else {
-        childContainer.style.display = "none";
-      }
+      childContainer.style.display = forceOpen ? "block" : "none";
 
       span.addEventListener("click", () => {
         childContainer.style.display =
@@ -108,24 +105,25 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
 
       card.appendChild(span);
 
-      const canEdit = currentRole === "owner";
-      card.appendChild(makeButton("➕", async () => {
-        const title = prompt("New bookmark title:");
-        const url = prompt("Bookmark URL (leave empty for folder):");
-        if (!title) return;
-        const type = url ? "link" : "folder";
-        await api("/bookmarks", {
-          method: "POST",
-          body: { parent_id: node.id, type, title, url },
-        });
-        loadBookmarks();
-      }, canEdit));
+      if (currentRole === "owner") {
+        card.appendChild(makeButton("➕", async () => {
+          const title = prompt("New bookmark title:");
+          const url = prompt("Bookmark URL (leave empty for folder):");
+          if (!title) return;
+          const type = url ? "link" : "folder";
+          await api("/bookmarks", {
+            method: "POST",
+            body: { parent_id: node.id, type, title, url },
+          });
+          loadBookmarks();
+        }));
 
-      card.appendChild(makeButton("🗑️", async () => {
-        if (!confirm("Delete this folder and its contents?")) return;
-        await api("/bookmarks/" + node.id, { method: "DELETE" });
-        loadBookmarks();
-      }, canEdit));
+        card.appendChild(makeButton("🗑️", async () => {
+          if (!confirm("Delete this folder and its contents?")) return;
+          await api("/bookmarks/" + node.id, { method: "DELETE" });
+          loadBookmarks();
+        }));
+      }
 
       li.appendChild(card);
       li.appendChild(childContainer);
@@ -138,23 +136,24 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
       a.classList.add("bubble-label");
       card.appendChild(a);
 
-      const canEdit = currentRole === "owner";
-      card.appendChild(makeButton("✏️", async () => {
-        const newTitle = prompt("Edit title:", node.title);
-        const newUrl = prompt("Edit URL:", node.url);
-        if (!newTitle) return;
-        await api("/bookmarks/" + node.id, {
-          method: "PUT",
-          body: { title: newTitle, url: newUrl },
-        });
-        loadBookmarks();
-      }, canEdit));
+      if (currentRole === "owner") {
+        card.appendChild(makeButton("✏️", async () => {
+          const newTitle = prompt("Edit title:", node.title);
+          const newUrl = prompt("Edit URL:", node.url);
+          if (!newTitle) return;
+          await api("/bookmarks/" + node.id, {
+            method: "PUT",
+            body: { title: newTitle, url: newUrl },
+          });
+          loadBookmarks();
+        }));
 
-      card.appendChild(makeButton("🗑️", async () => {
-        if (!confirm("Delete this link?")) return;
-        await api("/bookmarks/" + node.id, { method: "DELETE" });
-        loadBookmarks();
-      }, canEdit));
+        card.appendChild(makeButton("🗑️", async () => {
+          if (!confirm("Delete this link?")) return;
+          await api("/bookmarks/" + node.id, { method: "DELETE" });
+          loadBookmarks();
+        }));
+      }
 
       li.appendChild(card);
     }
