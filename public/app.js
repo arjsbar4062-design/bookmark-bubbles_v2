@@ -8,50 +8,43 @@ const roleSelect = document.getElementById("role");
 const passwordInput = document.getElementById("password");
 const logoutBtn = document.getElementById("logout");
 const searchInput = document.getElementById("search");
+const ownerControls = document.getElementById("owner-controls");
 
-// --- API helper with session cookies ---
+// --- API helper ---
 async function api(path, options = {}) {
   const res = await fetch("/api" + path, {
     method: options.method || "GET",
     headers: { "Content-Type": "application/json" },
     body: options.body ? JSON.stringify(options.body) : undefined,
-    credentials: "include"   // 🔑 keep session cookies
+    credentials: "include"
   });
-
   if (!res.ok) {
     let msg = res.statusText;
-    try { 
-      const data = await res.json();
-      msg = data.error || msg;
-    } catch {}
-    if (res.status === 403) {
-      showPopup("⛔ You don’t have permission (owner only).");
-    }
+    try { msg = (await res.json()).error || msg; } catch {}
+    if (res.status === 403) showPopup("⛔ Owner only");
     throw new Error(msg);
   }
   return res.json();
 }
 
-// --- login ---
+// login
 loginForm.addEventListener("submit", async e => {
   e.preventDefault();
   try {
     const role = roleSelect.value;
     const password = passwordInput.value;
-    const res = await api("/login", {
-      method: "POST",
-      body: { role, password }
-    });
+    const res = await api("/login", { method: "POST", body: { role, password } });
     currentRole = res.role;
     loginScreen.classList.add("hidden");
     appScreen.classList.remove("hidden");
+    ownerControls.style.display = currentRole === "owner" ? "block" : "none";
     loadBookmarks();
   } catch (err) {
     showPopup("❌ Login failed: " + err.message);
   }
 });
 
-// --- logout ---
+// logout
 logoutBtn.addEventListener("click", async () => {
   await api("/logout", { method: "POST" });
   currentRole = null;
@@ -59,7 +52,15 @@ logoutBtn.addEventListener("click", async () => {
   loginScreen.classList.remove("hidden");
 });
 
-// --- popup helper ---
+// reset button (owner only)
+document.getElementById("reset-bookmarks").addEventListener("click", async () => {
+  if (!confirm("Reset bookmarks from Stuff v8.html?")) return;
+  await api("/reset-bookmarks", { method: "POST" });
+  loadBookmarks();
+  showPopup("🔄 Bookmarks reset from Stuff v8.html");
+});
+
+// popup
 function showPopup(msg) {
   const popup = document.createElement("div");
   popup.className = "popup";
@@ -68,7 +69,7 @@ function showPopup(msg) {
   setTimeout(() => popup.remove(), 3000);
 }
 
-// --- make button ---
+// helper: make button
 function makeButton(label, handler, show = true) {
   if (!show) return document.createElement("span");
   const btn = document.createElement("button");
@@ -77,7 +78,7 @@ function makeButton(label, handler, show = true) {
   return btn;
 }
 
-// --- render tree (fixed) ---
+// renderTree (same as before, expandable folders, new tab links)
 function renderTree(nodes, depth = 0, forceOpen = false) {
   const ul = document.createElement("ul");
   ul.style.listStyle = "none";
@@ -94,7 +95,6 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
       span.style.cursor = "pointer";
       span.classList.add("bubble-label");
 
-      // nested children
       const childContainer = renderTree(node.children || [], depth + 1, forceOpen);
       childContainer.style.display = forceOpen ? "block" : "none";
 
@@ -164,48 +164,38 @@ function renderTree(nodes, depth = 0, forceOpen = false) {
   return ul;
 }
 
-// --- filter tree ---
+// filter + render
 function filterTree(nodes, query) {
   if (!query) return nodes;
   query = query.toLowerCase();
-
-  return nodes
-    .map(node => {
-      if (node.type === "folder") {
-        const filteredChildren = filterTree(node.children || [], query);
-        if (node.title.toLowerCase().includes(query) || filteredChildren.length > 0) {
-          return { ...node, children: filteredChildren };
-        }
-      } else {
-        if (node.title.toLowerCase().includes(query) || (node.url && node.url.toLowerCase().includes(query))) {
-          return node;
-        }
+  return nodes.map(n => {
+    if (n.type === "folder") {
+      const kids = filterTree(n.children || [], query);
+      if (n.title.toLowerCase().includes(query) || kids.length > 0) {
+        return { ...n, children: kids };
       }
-      return null;
-    })
-    .filter(n => n);
+    } else if (n.title.toLowerCase().includes(query) || (n.url && n.url.toLowerCase().includes(query))) {
+      return n;
+    }
+    return null;
+  }).filter(Boolean);
 }
 
-// --- load bookmarks ---
 async function loadBookmarks() {
   try {
     const data = await api("/bookmarks");
     allBookmarks = Array.isArray(data) ? data : [];
     renderFilteredTree();
   } catch (err) {
-    treeContainer.innerHTML =
-      `<div class="error">⚠️ Failed to load bookmarks: ${err.message}</div>`;
+    treeContainer.innerHTML = `<div class="error">⚠️ Failed to load bookmarks: ${err.message}</div>`;
   }
 }
 
-// --- render based on search ---
 function renderFilteredTree() {
   const query = searchInput.value;
   const filtered = filterTree(allBookmarks, query);
   treeContainer.innerHTML = "";
-  const tree = renderTree(filtered, 0, !!query);
-  treeContainer.appendChild(tree);
+  treeContainer.appendChild(renderTree(filtered, 0, !!query));
 }
 
-// --- search input listener ---
 searchInput.addEventListener("input", renderFilteredTree);
