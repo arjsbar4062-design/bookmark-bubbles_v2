@@ -1,48 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>Bookmark Bubbles</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Login Screen -->
-  <div id="login-screen" class="screen">
-    <div class="card">
-      <h1>Bookmark Bubbles</h1>
-      <form id="login-form">
-        <label for="role">Role:</label>
-        <select id="role" name="role">
-          <option value="guest">Guest</option>
-          <option value="owner">Owner</option>
-        </select>
-
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required>
-
-        <button type="submit">Login</button>
-      </form>
-      <div id="login-error" class="error"></div>
-    </div>
+  <div id="login-screen">
+    <form id="login-form">
+      <select id="role">
+        <option value="guest">Guest</option>
+        <option value="owner">Owner</option>
+      </select>
+      <input type="password" id="password" placeholder="Password" />
+      <button type="submit">Login</button>
+    </form>
   </div>
 
-  <!-- App Screen -->
-  <div id="app-screen" class="screen hidden">
-    <header class="card">
-      <h2>Bookmark Tree</h2>
+  <div id="app-screen" class="hidden">
+    <div id="top-bar">
+      <input id="search" placeholder="Search bookmarks..." />
       <button id="logout">Logout</button>
-    </header>
-
-    <!-- 🔍 Search bar -->
-    <div class="card search-card">
-      <input type="text" id="search" placeholder="🔍 Search bookmarks...">
     </div>
 
-    <div id="bookmark-tree" class="card"></div>
-  </div>
+    <div id="owner-controls" style="display:none; margin:10px 0;">
+      <button id="reset-bookmarks">🔄 Reset Bookmarks</button>
+    </div>
 
-  <!-- Popup -->
-  <div id="popup"></div>
+    <div id="bookmark-tree"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>
