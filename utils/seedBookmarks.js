@@ -1,50 +1,52 @@
-import { nanoid } from 'nanoid';
+import fs from "fs";
+import path from "path";
+import { JSDOM } from "jsdom";
 
-// Parse Netscape bookmarks export with regex
-function parseBookmarks(html) {
-  const lines = html.split('\n');
-  const stack = [{ title: 'Root', type: 'folder', children: [] }];
-  
-  lines.forEach(line => {
-    line = line.trim();
-    if (line.startsWith('<DT><H3')) {
-      const title = line.replace(/.*<H3[^>]*>(.*?)<\/H3>.*/, '$1');
-      const folder = { type: 'folder', title, children: [] };
-      stack[stack.length - 1].children.push(folder);
-      stack.push(folder);
-    } else if (line.startsWith('</DL>')) {
-      if (stack.length > 1) stack.pop();
-    } else if (line.startsWith('<DT><A')) {
-      const urlMatch = line.match(/HREF="([^"]+)"/i);
-      const title = line.replace(/.*<A[^>]*>(.*?)<\/A>.*/, '$1');
-      stack[stack.length - 1].children.push({
-        type: 'link',
-        title,
-        url: urlMatch ? urlMatch[1] : null
-      });
-    }
-  });
-  return stack[0]; // always return root
-}
+export default function seedBookmarks(db) {
+  const count = db.prepare("SELECT COUNT(*) as c FROM bookmarks").get().c;
+  if (count > 0) return; // already seeded
 
-export async function seedBookmarks(db, html) {
-  const root = parseBookmarks(html);
+  console.log("📂 Seeding bookmarks from Stuff v8.html...");
 
-  if (!root || !root.children) {
-    console.error("⚠️ No bookmarks parsed from Stuff v8.html");
+  const htmlPath = path.join(process.cwd(), "db", "Stuff v8.html");
+  if (!fs.existsSync(htmlPath)) {
+    console.error("⚠️ Stuff v8.html not found in ./db/");
     return;
   }
 
-  function insertNode(node, parent_id = null, pos = 0) {
-    const id = nanoid();
-    db.prepare(
-      'INSERT INTO bookmarks(id,parent_id,type,title,url,position) VALUES (?,?,?,?,?,?)'
-    ).run(id, parent_id, node.type, node.title, node.url || null, pos);
+  const html = fs.readFileSync(htmlPath, "utf8");
+  const dom = new JSDOM(html);
+  const rootDL = dom.window.document.querySelector("DL");
 
-    if (node.type === 'folder' && node.children) {
-      node.children.forEach((ch, i) => insertNode(ch, id, i));
-    }
+  function insertDL(dl, parentId) {
+    let position = 0;
+
+    dl.querySelectorAll(":scope > DT").forEach(dt => {
+      const a = dt.querySelector(":scope > A");
+      const h3 = dt.querySelector(":scope > H3");
+
+      if (a) {
+        // bookmark link
+        db.prepare(
+          `INSERT INTO bookmarks (id, parent_id, type, title, url, position)
+           VALUES (lower(hex(randomblob(16))), ?, 'link', ?, ?, ?)`
+        ).run(parentId, a.textContent.trim(), a.href, position++);
+      } else if (h3) {
+        // folder
+        const id = db.prepare("SELECT lower(hex(randomblob(16))) as id").get().id;
+        db.prepare(
+          `INSERT INTO bookmarks (id, parent_id, type, title, url, position)
+           VALUES (?, ?, 'folder', ?, NULL, ?)`
+        ).run(id, parentId, h3.textContent.trim(), position++);
+
+        // recurse into child DL
+        const childDL = dt.querySelector(":scope > DL");
+        if (childDL) insertDL(childDL, id);
+      }
+    });
   }
 
-  root.children.forEach((ch, i) => insertNode(ch, null, i));
+  if (rootDL) insertDL(rootDL, null);
+
+  console.log("✅ Bookmarks seeded successfully");
 }
