@@ -1,34 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bookmark Bubbles</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Login Screen -->
   <div id="login-screen">
+    <h2>Login</h2>
     <form id="login-form">
-      <select id="role">
+      <select id="role" required>
         <option value="guest">Guest</option>
         <option value="owner">Owner</option>
       </select>
-      <input type="password" id="password" placeholder="Password" />
+      <input type="password" id="password" placeholder="Enter password" required />
       <button type="submit">Login</button>
     </form>
   </div>
 
+  <!-- App Screen -->
   <div id="app-screen" class="hidden">
+    <!-- Top bar -->
     <div id="top-bar">
-      <input id="search" placeholder="Search bookmarks..." />
+      <input type="text" id="search" placeholder="Search bookmarks..."/>
       <button id="logout">Logout</button>
     </div>
 
-    <div id="owner-controls" style="display:none; margin:10px 0;">
-      <button id="reset-bookmarks">🔄 Reset Bookmarks</button>
+    <!-- Owner controls -->
+    <div id="owner-controls" class="hidden">
+      <button id="btn-add">➕ Add Bookmark</button>
+      <button id="btn-reset">Reset Bookmarks</button>
+      <button id="btn-requests">Review Requests</button>
     </div>
 
+    <!-- Bookmark tree -->
     <div id="bookmark-tree"></div>
   </div>
+
+  <!-- Popup container -->
+  <div id="popup-container"></div>
 
   <script src="app.js"></script>
 </body>
